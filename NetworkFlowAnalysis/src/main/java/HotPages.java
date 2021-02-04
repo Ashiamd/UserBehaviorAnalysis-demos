@@ -16,6 +16,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.runtime.operators.util.AssignerWithPeriodicWatermarksAdapter;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 
 import java.net.URL;
 import java.sql.Timestamp;
@@ -34,8 +35,12 @@ public class HotPages {
         env.setParallelism(1);
 
         // 读取文件，转换成POJO
-        URL resource = HotPages.class.getResource("/apache.log");
-        DataStream<String> inputStream = env.readTextFile(resource.getPath());
+//        URL resource = HotPages.class.getResource("/apache.log");
+//        DataStream<String> inputStream = env.readTextFile(resource.getPath());
+
+        // 方便测试，使用本地Socket输入数据
+        DataStream<String> inputStream = env.socketTextStream("localhost", 7777);
+
 
         DataStream<ApacheLogEvent> dataStream = inputStream
                 .map(line -> {
@@ -53,6 +58,12 @@ public class HotPages {
                         }
                 ));
 
+        dataStream.print("data");
+
+
+        // 定义一个侧输出流标签
+        OutputTag<ApacheLogEvent> lateTag = new OutputTag<ApacheLogEvent>("late"){};
+
         // 分组开窗聚合
         SingleOutputStreamOperator<PageViewCount> windowAggStream = dataStream
                 // 过滤get请求
@@ -64,8 +75,13 @@ public class HotPages {
                 // 按照url分组
                 .keyBy(ApacheLogEvent::getUrl)
                 .window(SlidingEventTimeWindows.of(Time.minutes(10), Time.seconds(5)))
-//                .allowedLateness(Time.minutes(1))
+                .allowedLateness(Time.minutes(1))
+                .sideOutputLateData(lateTag)
                 .aggregate(new PageCountAgg(), new PageCountResult());
+
+
+        windowAggStream.print("agg");
+        windowAggStream.getSideOutput(lateTag).print("late");
 
 
         // 收集同一窗口count数据，排序输出
@@ -156,6 +172,8 @@ public class HotPages {
             Thread.sleep(1000L);
 
             out.collect(resultBuilder.toString());
+
+            pageViewCountListState.clear();
         }
     }
 }
