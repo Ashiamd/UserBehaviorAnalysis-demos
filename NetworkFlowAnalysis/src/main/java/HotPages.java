@@ -45,7 +45,7 @@ public class HotPages {
                     return new ApacheLogEvent(fields[0], fields[1], timestamp, fields[5], fields[6]);
                 })
                 .assignTimestampsAndWatermarks(new AssignerWithPeriodicWatermarksAdapter.Strategy<>(
-                        new BoundedOutOfOrdernessTimestampExtractor<ApacheLogEvent>(Time.of(1, TimeUnit.MINUTES)) {
+                        new BoundedOutOfOrdernessTimestampExtractor<ApacheLogEvent>(Time.of(1, TimeUnit.SECONDS)) {
                             @Override
                             public long extractTimestamp(ApacheLogEvent element) {
                                 return element.getTimestamp();
@@ -64,10 +64,16 @@ public class HotPages {
                 // 按照url分组
                 .keyBy(ApacheLogEvent::getUrl)
                 .window(SlidingEventTimeWindows.of(Time.minutes(10), Time.seconds(5)))
+//                .allowedLateness(Time.minutes(1))
                 .aggregate(new PageCountAgg(), new PageCountResult());
 
 
-        windowAggStream.print();
+        // 收集同一窗口count数据，排序输出
+        DataStream<String> resultStream = windowAggStream
+                .keyBy(PageViewCount::getWindowEnd)
+                .process(new TopNHotPages(3));
+
+        resultStream.print();
 
         env.execute("hot pages job");
     }
