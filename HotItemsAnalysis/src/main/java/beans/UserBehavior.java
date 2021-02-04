@@ -6,6 +6,10 @@ package beans;
  */
 public class UserBehavior {
     private Long uerId;
+    private Long itemId;
+    private Integer categoryId;
+    private String behavior;
+    private Long timestamp;
 
     @Override
     public String toString() {
@@ -69,8 +73,5 @@ public class UserBehavior {
     public UserBehavior() {
     }
 
-    private Long itemId;
-    private Integer categoryId;
-    private String behavior;
-    private Long timestamp;
+
 }
