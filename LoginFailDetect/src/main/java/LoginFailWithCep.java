@@ -46,19 +46,13 @@ public class LoginFailWithCep {
         // 1. 定义一个匹配模式
         // firstFail -> secondFail, within 2s
         Pattern<LoginEvent, LoginEvent> loginFailPattern = Pattern
-                .<LoginEvent>begin("firstFail").where(new SimpleCondition<LoginEvent>() {
+                .<LoginEvent>begin("failEvents").where(new SimpleCondition<LoginEvent>() {
                     @Override
                     public boolean filter(LoginEvent value) throws Exception {
                         return "fail".equals(value.getLoginState());
                     }
-                })
-                .next("secondFail").where(new SimpleCondition<LoginEvent>() {
-                    @Override
-                    public boolean filter(LoginEvent value) throws Exception {
-                        return "fail".equals(value.getLoginState());
-                    }
-                })
-                .within(Time.seconds(2));
+                }).times(3).consecutive()
+                .within(Time.seconds(5));
 
         // 2. 将匹配模式应用到数据流上，得到一个pattern stream
         PatternStream<LoginEvent> patternStream = CEP.pattern(loginEventStream.keyBy(LoginEvent::getUserId), loginFailPattern);
@@ -75,9 +69,9 @@ public class LoginFailWithCep {
     public static class LoginFailMatchDetectWarning implements PatternSelectFunction<LoginEvent, LoginFailWarning> {
         @Override
         public LoginFailWarning select(Map<String, List<LoginEvent>> pattern) throws Exception {
-            LoginEvent firstFailEvent = pattern.get("firstFail").iterator().next();
-            LoginEvent lastFailEvent = pattern.get("secondFail").get(0);
-            return new LoginFailWarning(firstFailEvent.getUserId(), firstFailEvent.getTimestamp(), lastFailEvent.getTimestamp(), "login fail 2 times");
+            LoginEvent firstFailEvent = pattern.get("failEvents").get(0);
+            LoginEvent lastFailEvent = pattern.get("failEvents").get(pattern.get("failEvents").size() - 1);
+            return new LoginFailWarning(firstFailEvent.getUserId(), firstFailEvent.getTimestamp(), lastFailEvent.getTimestamp(), "login fail " + pattern.get("failEvents").size() + " times");
         }
     }
 }
