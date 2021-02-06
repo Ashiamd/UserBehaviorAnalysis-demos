@@ -9,6 +9,7 @@
         <module name="NetworkFlowAnalysis" />
         <module name="HotItemsAnalysis" />
         <module name="MarketAnalysis" />
+        <module name="OrderPayDetect" />
         <module name="LoginFailDetect" />
       </profile>
     </annotationProcessing>
